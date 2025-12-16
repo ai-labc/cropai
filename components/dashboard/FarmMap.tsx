@@ -8,6 +8,7 @@
 import { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import type { Feature, FeatureCollection } from 'geojson';
 import { FieldBoundary, NDVIGrid, StressIndex, MapLayerType } from '@/types';
 import { useDashboardStore } from '@/store/dashboardStore';
 
@@ -70,19 +71,21 @@ export function FarmMap({
     }
 
     // Create GeoJSON feature collection
-    const features = fieldBoundaries.map((boundary) => ({
-      type: 'Feature' as const,
+    const features: Feature[] = fieldBoundaries.map((boundary) => ({
+      type: 'Feature',
       id: boundary.id,
-      geometry: boundary.geometry,
+      geometry: boundary.geometry as Feature['geometry'],
       properties: boundary.properties,
     }));
 
+    const featureCollection: FeatureCollection = {
+      type: 'FeatureCollection',
+      features,
+    };
+
     map.current.addSource(sourceId, {
       type: 'geojson',
-      data: {
-        type: 'FeatureCollection',
-        features,
-      },
+      data: featureCollection,
     });
 
     map.current.addLayer({
