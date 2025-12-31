@@ -23,11 +23,11 @@ interface SelectProps {
 
 export function Select({ label, options, selected, onChange, disabled = false }: SelectProps) {
   return (
-    <div className="flex items-center gap-2">
-      <span className="text-white font-medium">{label}:</span>
+    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto">
+      <span className="text-white font-medium text-sm sm:text-base whitespace-nowrap">{label}:</span>
       <Listbox value={selected} onChange={onChange} disabled={disabled}>
-        <div className="relative">
-          <Listbox.Button className="relative w-48 cursor-default rounded-lg bg-white py-2 pl-3 pr-10 text-left shadow-md focus:outline-none focus-visible:border-indigo-500 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75 focus-visible:ring-offset-2 focus-visible:ring-offset-blue-300 sm:text-sm">
+        <div className="relative w-full sm:w-48">
+          <Listbox.Button className="relative w-full sm:w-48 cursor-default rounded-lg bg-white py-2 pl-3 pr-10 text-left shadow-md focus:outline-none focus-visible:border-indigo-500 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75 focus-visible:ring-offset-2 focus-visible:ring-offset-blue-300 text-sm">
             <span className="block truncate text-gray-900">
               {selected?.name || 'Select...'}
             </span>

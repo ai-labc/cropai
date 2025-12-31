@@ -54,18 +54,43 @@ export function DashboardHeader() {
     : crops.map((crop) => ({ id: crop.id, name: crop.name }));
 
   return (
-    <div className="bg-primary-dark px-6 py-4 flex items-center justify-between">
-      <h1 className="text-3xl font-bold text-white">Dashboard</h1>
-      <div className="flex items-center gap-6">
+    <div className="bg-primary-dark px-4 sm:px-6 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <h1 className="text-2xl sm:text-3xl font-bold text-white">Dashboard</h1>
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 sm:gap-6 w-full sm:w-auto">
         <Select
           label="Farm"
           options={farmOptions}
           selected={selectedFarm ? { id: selectedFarm.id, name: selectedFarm.name } : null}
           onChange={(option) => {
             const farm = farms.find((f) => f.id === option?.id);
-            setSelectedFarm(farm || null);
-            // Reset crop selection when farm changes (since available crops change)
-            setSelectedCrop(null);
+            
+            // Auto-select first available crop when farm is selected
+            if (farm) {
+              const availableCrops = crops.filter((crop) => {
+                if (farm.id === 'farm-1') {
+                  return crop.id === 'crop-1'; // AB only has Canola
+                } else if (farm.id === 'farm-2') {
+                  return crop.id === 'crop-2'; // BC only has Timothy Hay
+                }
+                return true; // Fallback: show all crops
+              });
+              
+              // First set the farm
+              setSelectedFarm(farm);
+              
+              // Then set the crop (this will trigger loadFieldBoundaries and loadKPISummary)
+              if (availableCrops.length > 0) {
+                // Use setTimeout to ensure farm is set before crop
+                setTimeout(() => {
+                  setSelectedCrop(availableCrops[0]);
+                }, 0);
+              } else {
+                setSelectedCrop(null);
+              }
+            } else {
+              setSelectedFarm(null);
+              setSelectedCrop(null);
+            }
           }}
           disabled={farms.length === 0}
         />

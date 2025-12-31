@@ -80,159 +80,20 @@ async def get_ndvi_grid_endpoint(field_id: str, date: str = None):
     """
     try:
         from datetime import datetime, timedelta
-        from app.api.routes.fields import get_fields
         from app.services.sentinel2 import calculate_ndvi
         from app.api.models import GridData, GridBounds
+        from app.services.geometry_service import get_field_geometry_with_fallback
         import numpy as np
         
-        # Step 1: Get field geometry from field_id
-        # Direct field data lookup (same as fields.py)
-        field_geometry = None
+        # Step 1: Get field geometry from shared geometry service (single source of truth)
+        # This ensures NDVI uses the exact same geometry as the boundaries endpoint
+        field_geometry = get_field_geometry_with_fallback(field_id)
         
-        # Field data mapping (same structure as fields.py)
-        field_data_map = {
-            "field-1": {
-                "farm_id": "farm-1",
-                "crop_id": "crop-1",
-                "geometry": {
-                    "type": "Polygon",
-                    "coordinates": [[
-                        [-113.097639, 52.614167],  # SW
-                        [-113.087639, 52.614167],  # SE
-                        [-113.087639, 52.624167],  # NE
-                        [-113.097639, 52.624167],  # NW
-                        [-113.097639, 52.614167]   # Close polygon
-                    ]]
-                }
-            },
-            "field-2": {
-                "farm_id": "farm-1",
-                "crop_id": "crop-1",
-                "geometry": {
-                    "type": "Polygon",
-                    "coordinates": [[
-                        [-113.102639, 52.614167],
-                        [-113.092639, 52.614167],
-                        [-113.092639, 52.624167],
-                        [-113.102639, 52.624167],
-                        [-113.102639, 52.614167]
-                    ]]
-                }
-            },
-            "field-3": {
-                "farm_id": "farm-2",
-                "crop_id": "crop-2",
-                "geometry": {
-                    "type": "Polygon",
-                    "coordinates": [[
-                        [-124.02167, 54.01167],  # SW
-                        [-124.01167, 54.01167],  # SE
-                        [-124.01167, 54.02167],  # NE
-                        [-124.02167, 54.02167],  # NW
-                        [-124.02167, 54.01167]   # Close polygon
-                    ]]
-                }
-            },
-            "field-4": {
-                "farm_id": "farm-2",
-                "crop_id": "crop-2",
-                "geometry": {
-                    "type": "Polygon",
-                    "coordinates": [[
-                        [-124.02667, 54.01167],
-                        [-124.01667, 54.01167],
-                        [-124.01667, 54.02167],
-                        [-124.02667, 54.02167],
-                        [-124.02667, 54.01167]
-                    ]]
-                }
-            }
-        }
-        
-        if field_id in field_data_map:
-            field_geometry = field_data_map[field_id]["geometry"]
-        else:
-            # Fallback: try to get from fields endpoint
-            try:
-                field_to_farm_crop = {
-                    "field-1": ("farm-1", "crop-1"),
-                    "field-2": ("farm-1", "crop-1"),
-                    "field-3": ("farm-2", "crop-2"),
-                    "field-4": ("farm-2", "crop-2"),
-                }
-                if field_id in field_to_farm_crop:
-                    farm_id, crop_id = field_to_farm_crop[field_id]
-                    fields_response = await get_fields(farm_id, crop_id)
-                    if fields_response.status == "success":
-                        for field in fields_response.data:
-                            if field.id == field_id:
-                                field_geometry = field.geometry
-                                break
-            except Exception as e:
-                print(f"[NDVI Grid] Error fetching fields: {e}")
-        
-        # If field not found, try to get from fields API
-        # First, try to extract farm_id and crop_id from field_id pattern (e.g., field-farm-1-crop-2)
         if not field_geometry:
-            import re
-            farm_match = re.search(r'farm-(\d+)', field_id)
-            crop_match = re.search(r'crop-(\d+)', field_id)
-            
-            if farm_match and crop_match:
-                # Extract farm_id and crop_id from field_id
-                farm_id = f"farm-{farm_match.group(1)}"
-                crop_id = f"crop-{crop_match.group(1)}"
-                
-                try:
-                    fields_response = await get_fields(farm_id, crop_id)
-                    if fields_response.status == "success":
-                        print(f"[NDVI Grid] Searching for field {field_id} in farm {farm_id}, crop {crop_id}")
-                        print(f"[NDVI Grid] Available fields: {[f.id for f in fields_response.data]}")
-                        for field in fields_response.data:
-                            if field.id == field_id:
-                                field_geometry = field.geometry
-                                # Log geometry bounds for debugging
-                                if field_geometry and field_geometry.get("coordinates"):
-                                    coords = field_geometry["coordinates"][0]
-                                    lngs = [c[0] for c in coords]
-                                    lats = [c[1] for c in coords]
-                                    print(f"[NDVI Grid] Found field {field_id} from fields API")
-                                    print(f"[NDVI Grid] Geometry bounds: lat=[{min(lats):.6f}, {max(lats):.6f}], lng=[{min(lngs):.6f}, {max(lngs):.6f}]")
-                                break
-                except Exception as e:
-                    print(f"[NDVI Grid] Error fetching fields for {farm_id}/{crop_id}: {e}")
-            
-            # No fallback search - only use exact farm/crop combination
-            # This prevents finding wrong fields from other combinations
-        
-        # If still not found, use default bounds based on farm location (not crop)
-        if not field_geometry:
-            print(f"[NDVI Grid] Field {field_id} not found in database, using default bounds based on farm location")
-            import re
-            farm_match = re.search(r'farm-(\d+)', field_id)
-            
-            # Use farm location - each farm's crops should be displayed at that farm's location
-            if farm_match:
-                farm_num = farm_match.group(1)
-                if farm_num == "1":
-                    base_lat, base_lng = 52.619167, -113.092639  # farm-1 (AB) - Hartland Colony
-                else:
-                    base_lat, base_lng = 54.0167, -124.0167  # farm-2 (BC) - Exceedagro
-            else:
-                # Default to farm-1 location (AB)
-                base_lat, base_lng = 52.619167, -113.092639
-            
-            # Create default geometry
-            field_geometry = {
-                "type": "Polygon",
-                "coordinates": [[
-                    [base_lng - 0.005, base_lat - 0.005],
-                    [base_lng + 0.005, base_lat - 0.005],
-                    [base_lng + 0.005, base_lat + 0.005],
-                    [base_lng - 0.005, base_lat + 0.005],
-                    [base_lng - 0.005, base_lat - 0.005]
-                ]]
-            }
+            raise HTTPException(
+                status_code=404,
+                detail=f"Field geometry not found for field_id: {field_id}"
+            )
         
         # Step 2: Calculate bbox from geometry
         if field_geometry.get("type") == "Polygon" and field_geometry.get("coordinates"):

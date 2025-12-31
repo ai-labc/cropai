@@ -132,6 +132,8 @@ npm run dev
 - Swagger UI: http://localhost:8000/docs
 - ReDoc: http://localhost:8000/redoc
 
+상세한 API 문서는 [API.md](./API.md)를 참조하세요.
+
 ## 주요 기능
 
 ### 대시보드 구성 요소
@@ -168,15 +170,37 @@ Backend API → APIClient → Zustand Store → React Components
 2. **상태 업데이트**: Zustand store가 데이터를 저장하고 관리
 3. **UI 렌더링**: React 컴포넌트가 store에서 데이터를 구독하여 렌더링
 
+## API 문서
+
+상세한 API 문서는 [API.md](./API.md)를 참조하세요.
+
+주요 엔드포인트:
+- `GET /api/farms` - 농장 목록
+- `GET /api/crops` - 작물 목록
+- `GET /api/fields?farm_id={id}&crop_id={id}` - 필드 경계
+- `GET /api/kpi` - KPI 요약
+- `GET /api/ndvi/{field_id}/grid` - NDVI 그리드
+- `GET /api/stress/{field_id}` - 스트레스 인덱스
+
+## 에러 처리
+
+프론트엔드는 다음과 같은 에러를 처리합니다:
+- **네트워크 오류**: 백엔드 서버 연결 실패
+- **타임아웃**: 요청 시간 초과 (60초)
+- **API 오류**: 백엔드에서 반환한 에러
+- **검증 오류**: 잘못된 입력 파라미터
+
+에러 발생 시 재시도 버튼이 표시되며, 자세한 정보는 "자세한 정보 보기"를 클릭하여 확인할 수 있습니다.
+
 ## 향후 개선 사항
 
-- [ ] 실제 백엔드 API 연동
-- [ ] NDVI/스트레스 히트맵 실제 렌더링 (현재는 토글만 구현)
+- [x] 실제 백엔드 API 연동 ✅
+- [x] NDVI/스트레스 히트맵 실제 렌더링 ✅
+- [x] 에러 처리 및 로딩 상태 개선 ✅
 - [ ] 날짜 범위 필터 추가
 - [ ] 필드별 상세 정보 모달
 - [ ] 데이터 내보내기 기능
 - [ ] 반응형 디자인 개선
-- [ ] 에러 처리 및 로딩 상태 개선
 
 ## 라이선스
 

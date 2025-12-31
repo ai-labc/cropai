@@ -105,14 +105,41 @@ export class APIClient {
       } catch (fetchError) {
         clearTimeout(timeoutId);
         if (fetchError instanceof Error && fetchError.name === 'AbortError') {
-          throw new Error(`Request timeout after 60s: ${endpoint}`);
+          const timeoutError = new Error(`Request timeout after 60s: ${endpoint}`);
+          (timeoutError as any).errorType = 'timeout';
+          throw timeoutError;
         }
         throw fetchError;
       }
     } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        throw new Error(`Request timeout: ${endpoint}`);
+      if (error instanceof Error) {
+        // Network errors
+        if (error.name === 'AbortError' || error.message.includes('timeout')) {
+          const timeoutError = new Error(`요청 시간이 초과되었습니다. 네트워크 연결을 확인해주세요. (${endpoint})`);
+          (timeoutError as any).errorType = 'timeout';
+          throw timeoutError;
+        }
+        
+        // Network connectivity errors
+        if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+          const networkError = new Error(`네트워크 연결에 실패했습니다. 백엔드 서버가 실행 중인지 확인해주세요. (${this.baseUrl})`);
+          (networkError as any).errorType = 'network';
+          throw networkError;
+        }
+        
+        // CORS errors
+        if (error.message.includes('CORS') || error.message.includes('blocked')) {
+          const corsError = new Error(`CORS 오류가 발생했습니다. 백엔드 CORS 설정을 확인해주세요.`);
+          (corsError as any).errorType = 'network';
+          throw corsError;
+        }
+        
+        // API errors (already handled above, but add errorType)
+        if (error.message.includes('API error:')) {
+          (error as any).errorType = 'api';
+        }
       }
+      
       console.error(`[APIClient] Request failed: ${endpoint}`, error);
       throw error;
     }

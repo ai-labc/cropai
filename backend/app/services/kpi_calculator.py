@@ -31,11 +31,21 @@ async def calculate_kpi_summary(
     Returns:
         KPISummary with calculated values
     """
-    # Use default location if not provided (Hartland Colony, Alberta)
-    if lat is None:
-        lat = 52.619167  # Hartland Colony, Alberta
-    if lng is None:
-        lng = -113.092639
+    # Use location based on farm_id/crop_id if not provided
+    if lat is None or lng is None:
+        # Default locations based on farm/crop
+        if farm_id == 'farm-1' or crop_id == 'crop-1':
+            # Hartland Colony, Alberta (Canola)
+            lat = 52.619167
+            lng = -113.092639
+        elif farm_id == 'farm-2' or crop_id == 'crop-2':
+            # Exceedagro Reference Field, BC (Timothy Hay)
+            lat = 54.0167
+            lng = -124.0167
+        else:
+            # Default to Hartland Colony
+            lat = 52.619167
+            lng = -113.092639
     
     # Get date range (last 30 days)
     end_date = datetime.now()

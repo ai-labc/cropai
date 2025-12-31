@@ -41,6 +41,8 @@ interface DashboardState {
   // UI State
   activeMapLayer: MapLayerType;
   isLoading: boolean;
+  isLoadingNDVI: boolean;
+  isLoadingStress: boolean;
   error: string | null;
   
   // Actions
@@ -86,6 +88,8 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   // weatherData: new Map(), // Removed: Weather data is only used in backend calculations
   activeMapLayer: 'boundaries',
   isLoading: false,
+  isLoadingNDVI: false,
+  isLoadingStress: false,
   error: null,
 
   // Filter actions
@@ -103,9 +107,16 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       // Clear NDVI/Stress data when farm changes to prevent showing wrong data
       ndviGrids: new Map(),
       stressIndices: new Map(),
+      // Clear KPI when farm changes (will be reloaded when crop is also selected)
+      kpiSummary: null,
     });
     if (farm) {
-      get().loadFieldBoundaries();
+      // Only load field boundaries if crop is already selected
+      // Otherwise, wait for crop selection (which will trigger both)
+      if (get().selectedCrop) {
+        get().loadFieldBoundaries();
+        get().loadKPISummary();
+      }
     }
   },
 
@@ -117,9 +128,16 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       // Clear NDVI/Stress data when crop changes to prevent showing wrong data
       ndviGrids: new Map(),
       stressIndices: new Map(),
+      // Clear KPI when crop changes (will be reloaded)
+      kpiSummary: null,
     });
     if (crop) {
-      get().loadFieldBoundaries();
+      // Always load field boundaries and KPI when crop is selected
+      // (farm should already be selected at this point)
+      if (get().selectedFarm) {
+        get().loadFieldBoundaries();
+        get().loadKPISummary();
+      }
     }
   },
 
@@ -223,8 +241,8 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
             }
           }
           
-          // Load KPI summary first (fast, needed for UI)
-          get().loadKPISummary();
+          // KPI summary is already loaded by setSelectedFarm/setSelectedCrop
+          // Don't load here to avoid duplicate calls
           
           // Load other data asynchronously in parallel (don't block UI)
           // Use setTimeout to prevent blocking the main thread
@@ -253,54 +271,107 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   },
 
   loadKPISummary: async () => {
+    const state = get();
+    // Only load if both farm and crop are selected
+    if (!state.selectedFarm || !state.selectedCrop) {
+      console.log('[DashboardStore] loadKPISummary: No farm or crop selected, skipping');
+      set({ kpiSummary: null });
+      return;
+    }
+    
+    console.log('[DashboardStore] loadKPISummary called. Farm:', state.selectedFarm.id, 'Crop:', state.selectedCrop.id);
+    
     try {
-      const filters = get().filters;
+      const filters = state.filters;
+      
+      // Get location from selected farm (if available) or use farm location
+      let lat: number | undefined;
+      let lng: number | undefined;
+      
+      if (state.selectedFarm?.location) {
+        lat = state.selectedFarm.location.lat;
+        lng = state.selectedFarm.location.lng;
+        console.log('[DashboardStore] Using farm location for KPI:', lat, lng);
+      }
       
       // Try to load from cache first (synchronous, instant)
       const { APICache } = await import('@/lib/api/cache');
-      const cacheKey = `/kpi?farm_id=${filters.farmId || ''}&crop_id=${filters.cropId || ''}`;
+      const cacheKey = `/kpi?farm_id=${filters.farmId || ''}&crop_id=${filters.cropId || ''}${lat ? `&lat=${lat}&lng=${lng}` : ''}`;
+      console.log('[DashboardStore] KPI cache key:', cacheKey);
       const cached = APICache.get<APIResponse<KPISummary>>(cacheKey);
       
       if (cached && cached.status === 'success') {
+        console.log('[DashboardStore] KPI loaded from cache:', cached.data);
         set({ kpiSummary: cached.data });
+      } else {
+        console.log('[DashboardStore] No cached KPI data found');
       }
       
       // Then fetch fresh data in background (will update cache)
-      apiClient.getKPISummary(filters).then(response => {
+      // Pass location to backend so it can use farm-specific data
+      console.log('[DashboardStore] Fetching fresh KPI data...');
+      apiClient.getKPISummary(filters, lat, lng).then(response => {
         if (response.status === 'success') {
+          console.log('[DashboardStore] KPI data received:', response.data);
           set({ kpiSummary: response.data });
+        } else {
+          console.warn('[DashboardStore] KPI response status:', response.status);
         }
       }).catch(error => {
         // Keep cached data if available, silently fail
+        console.warn('[DashboardStore] Failed to load KPI summary:', error);
       });
     } catch (error) {
       // Silently fail - cached data will be used if available
+      console.warn('[DashboardStore] Error loading KPI summary:', error);
     }
   },
 
   loadNDVIGrid: async (fieldId: string) => {
+    // Skip if already loading or data exists
+    if (get().isLoadingNDVI || get().ndviGrids.has(fieldId)) {
+      return;
+    }
+    
+    set({ isLoadingNDVI: true });
     try {
       const response = await apiClient.getNDVIGrid(fieldId);
       if (response.status === 'success') {
         const grids = new Map(get().ndviGrids);
         grids.set(fieldId, response.data);
-        set({ ndviGrids: grids });
+        set({ ndviGrids: grids, isLoadingNDVI: false });
+      } else {
+        set({ isLoadingNDVI: false });
       }
     } catch (error) {
-      set({ error: error instanceof Error ? error.message : 'Failed to load NDVI grid' });
+      set({ 
+        error: error instanceof Error ? error.message : 'Failed to load NDVI grid',
+        isLoadingNDVI: false 
+      });
     }
   },
 
   loadStressIndex: async (fieldId: string) => {
+    // Skip if already loading or data exists
+    if (get().isLoadingStress || get().stressIndices.has(fieldId)) {
+      return;
+    }
+    
+    set({ isLoadingStress: true });
     try {
       const response = await apiClient.getStressIndex(fieldId);
       if (response.status === 'success') {
         const indices = new Map(get().stressIndices);
         indices.set(fieldId, response.data);
-        set({ stressIndices: indices });
+        set({ stressIndices: indices, isLoadingStress: false });
+      } else {
+        set({ isLoadingStress: false });
       }
     } catch (error) {
-      set({ error: error instanceof Error ? error.message : 'Failed to load stress index' });
+      set({ 
+        error: error instanceof Error ? error.message : 'Failed to load stress index',
+        isLoadingStress: false 
+      });
     }
   },
 
