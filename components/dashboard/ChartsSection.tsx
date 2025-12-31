@@ -18,6 +18,7 @@ export function ChartsSection() {
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Weather data is used only for backend calculations (KPI, Yield, Carbon), not displayed in UI */}
       <TimeSeriesChart
         title="SOIL MOISTURE"
         data={soilData}

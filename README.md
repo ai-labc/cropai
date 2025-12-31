@@ -73,29 +73,64 @@ cropai/
 
 ## 설치 및 실행
 
-### 1. 의존성 설치
+### 1. 프론트엔드 의존성 설치
 
 ``` bash
 npm install
 ```
 
-### 2. 환경 변수 설정
+### 2. 백엔드 설정
 
-`.env.local` 파일을 생성하고 Mapbox 토큰을 추가하세요:
+백엔드 디렉토리로 이동하여 Python 가상환경을 설정하세요:
+
+``` bash
+cd backend
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+`.env` 파일이 이미 생성되어 있으며 API 키가 설정되어 있습니다.
+
+### 3. 환경 변수 설정
+
+프론트엔드 루트 디렉토리에 `.env.local` 파일을 생성하세요:
 
 ``` env
+# Backend API URL
+NEXT_PUBLIC_API_URL=http://localhost:8000/api
+
+# Mapbox Token
 NEXT_PUBLIC_MAPBOX_TOKEN=your_mapbox_token_here
 ```
 
-Mapbox 토큰은 [Mapbox](https://account.mapbox.com/)에서 무료로 발급받을 수 있습니다.
+### 4. 서버 실행
 
-### 3. 개발 서버 실행
+**백엔드 서버 실행** (터미널 1):
+``` bash
+cd backend
+# Windows
+run.bat
+# 또는 Linux/Mac
+./run.sh
+# 또는 직접 실행
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
 
+백엔드 API는 `http://localhost:8000`에서 실행됩니다.
+
+**프론트엔드 서버 실행** (터미널 2):
 ``` bash
 npm run dev
 ```
 
 브라우저에서 [http://localhost:3000](http://localhost:3000)을 열어 대시보드를 확인하세요.
+
+### 5. API 문서 확인
+
+백엔드 서버 실행 후 다음 URL에서 API 문서를 확인할 수 있습니다:
+- Swagger UI: http://localhost:8000/docs
+- ReDoc: http://localhost:8000/redoc
 
 ## 주요 기능
 

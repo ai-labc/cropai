@@ -16,111 +16,95 @@ import {
   TimeSeriesData,
 } from '@/types';
 
-// Mock Farms
+// Mock Farms - Real Canadian farm data
 export const mockFarms: Farm[] = [
   {
     id: 'farm-1',
-    name: 'Green Valley Farm',
-    location: { lat: 37.7749, lng: -122.4194 },
-    area: 120.5,
+    name: 'Hartland Colony',
+    location: { lat: 52.619167, lng: -113.092639 },  // 52°37'09.0"N, 113°05'33.5"W
+    area: 250.5,
   },
   {
     id: 'farm-2',
-    name: 'Sunset Fields',
-    location: { lat: 37.7849, lng: -122.4094 },
-    area: 85.2,
+    name: 'Exceedagro Reference Field',
+    location: { lat: 54.0167, lng: -124.0167 },  // Vanderhoof, BC
+    area: 180.3,
   },
 ];
 
-// Mock Crops
+// Mock Crops - Real Canadian crop data
 export const mockCrops: Crop[] = [
   {
     id: 'crop-1',
-    name: 'Tomatoes',
-    type: 'vegetable',
-    plantingDate: '2024-03-15',
-    expectedHarvestDate: '2024-07-20',
-  },
-  {
-    id: 'crop-2',
-    name: 'Corn',
-    type: 'grain',
-    plantingDate: '2024-04-01',
+    name: 'Canola',
+    type: 'Oilseed',
+    plantingDate: '2024-05-01',
     expectedHarvestDate: '2024-09-15',
   },
   {
-    id: 'crop-3',
-    name: 'Wheat',
-    type: 'grain',
-    plantingDate: '2024-02-10',
-    expectedHarvestDate: '2024-06-30',
+    id: 'crop-2',
+    name: 'Timothy Hay',
+    type: 'Forage',
+    plantingDate: '2024-04-15',
+    expectedHarvestDate: '2024-07-20',
   },
 ];
 
-// Generate mock field boundaries (GeoJSON polygons)
+// Generate mock field boundaries (GeoJSON polygons) - Real Canadian farm locations
 export function generateMockFieldBoundaries(farmId: string, cropId: string): FieldBoundary[] {
-  const baseLat = 37.7749;
-  const baseLng = -122.4194;
+  // Farm locations
+  const farmLocations: Record<string, { lat: number; lng: number }> = {
+    'farm-1': { lat: 52.619167, lng: -113.092639 },  // Hartland Colony, Alberta
+    'farm-2': { lat: 54.0167, lng: -124.0167 },      // Exceedagro Reference Field, BC
+  };
+
+  // Crop types
+  const cropTypes: Record<string, string> = {
+    'crop-1': 'Canola',
+    'crop-2': 'Timothy Hay',
+  };
+
+  const farmLocation = farmLocations[farmId] || { lat: 52.619167, lng: -113.092639 };
+  const cropType = cropTypes[cropId] || 'Canola';
+  const baseLat = farmLocation.lat;
+  const baseLng = farmLocation.lng;
   
-  return [
-    {
-      id: 'field-1',
+  // Generate 2-3 fields per farm/crop combination
+  const numFields = 2 + Math.floor(Math.random() * 2);
+  const fields: FieldBoundary[] = [];
+  
+  for (let i = 0; i < numFields; i++) {
+    const offsetLat = (Math.random() - 0.5) * 0.02; // ~2km variation
+    const offsetLng = (Math.random() - 0.5) * 0.02;
+    
+    const centerLat = baseLat + offsetLat;
+    const centerLng = baseLng + offsetLng;
+    
+    // Create a rectangular field (approximately 500m x 500m)
+    const fieldSize = 0.0045; // ~500m in degrees (approximate)
+    
+    fields.push({
+      id: `field-${farmId}-${cropId}-${i + 1}`,
       farmId,
       cropId,
       geometry: {
         type: 'Polygon',
         coordinates: [[
-          [baseLng, baseLat],
-          [baseLng + 0.01, baseLat],
-          [baseLng + 0.01, baseLat + 0.01],
-          [baseLng, baseLat + 0.01],
-          [baseLng, baseLat],
+          [centerLng - fieldSize, centerLat - fieldSize],
+          [centerLng + fieldSize, centerLat - fieldSize],
+          [centerLng + fieldSize, centerLat + fieldSize],
+          [centerLng - fieldSize, centerLat + fieldSize],
+          [centerLng - fieldSize, centerLat - fieldSize],
         ]],
       },
       properties: {
-        area: 25.5,
-        cropType: 'Tomatoes',
+        area: 20 + Math.random() * 20, // 20-40 hectares
+        cropType: cropType,
       },
-    },
-    {
-      id: 'field-2',
-      farmId,
-      cropId,
-      geometry: {
-        type: 'Polygon',
-        coordinates: [[
-          [baseLng + 0.015, baseLat],
-          [baseLng + 0.025, baseLat],
-          [baseLng + 0.025, baseLat + 0.008],
-          [baseLng + 0.015, baseLat + 0.008],
-          [baseLng + 0.015, baseLat],
-        ]],
-      },
-      properties: {
-        area: 18.2,
-        cropType: 'Tomatoes',
-      },
-    },
-    {
-      id: 'field-3',
-      farmId,
-      cropId,
-      geometry: {
-        type: 'Polygon',
-        coordinates: [[
-          [baseLng, baseLat + 0.015],
-          [baseLng + 0.012, baseLat + 0.015],
-          [baseLng + 0.012, baseLat + 0.025],
-          [baseLng, baseLat + 0.025],
-          [baseLng, baseLat + 0.015],
-        ]],
-      },
-      properties: {
-        area: 22.8,
-        cropType: 'Tomatoes',
-      },
-    },
-  ];
+    });
+  }
+  
+  return fields;
 }
 
 // Generate mock KPI summary
@@ -152,10 +136,10 @@ export function generateMockNDVIGrid(fieldId: string): NDVIGrid {
     grid: {
       resolution: 10, // 10 meters per pixel
       bounds: {
-        north: 37.7849,
-        south: 37.7649,
-        east: -122.4094,
-        west: -122.4294,
+        north: 52.624167,  // Hartland Colony, Alberta
+        south: 52.614167,
+        east: -113.087639,
+        west: -113.102639,
       },
       values,
     },
@@ -181,10 +165,10 @@ export function generateMockStressIndex(fieldId: string): StressIndex {
     grid: {
       resolution: 10,
       bounds: {
-        north: 37.7849,
-        south: 37.7649,
-        east: -122.4094,
-        west: -122.4294,
+        north: 52.624167,  // Hartland Colony, Alberta
+        south: 52.614167,
+        east: -113.087639,
+        west: -113.102639,
       },
       values,
     },

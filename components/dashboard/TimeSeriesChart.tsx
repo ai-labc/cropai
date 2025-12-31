@@ -28,11 +28,23 @@ export function TimeSeriesChart({
   className = '',
 }: TimeSeriesChartProps) {
   // Format data for chart
-  const chartData = data.map((item) => ({
+  const chartData = data && data.length > 0 ? data.map((item) => ({
     ...item,
     date: format(parseISO(item.timestamp), 'MMM dd'),
     fullDate: item.timestamp,
-  }));
+  })) : [];
+
+  // Show placeholder if no data
+  if (!data || data.length === 0) {
+    return (
+      <div className={`bg-white rounded-lg shadow-md p-4 ${className}`}>
+        <h3 className="text-sm font-semibold text-gray-700 mb-4">{title}</h3>
+        <div className="h-[200px] flex items-center justify-center border-2 border-dashed border-gray-300 rounded">
+          <p className="text-gray-400 text-sm">데이터 로딩 중...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`bg-white rounded-lg shadow-md p-4 ${className}`}>

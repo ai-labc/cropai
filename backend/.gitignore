@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv
+
+# Environment variables
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Cache
+cache/
+*.cache
+.pytest_cache/
+
+# Data files
+*.tif
+*.tiff
+*.nc
+*.h5
+*.hdf5
+
+# Logs
+*.log
+
