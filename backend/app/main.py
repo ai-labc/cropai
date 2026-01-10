@@ -2,7 +2,7 @@
 FastAPI application entry point
 """
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.api.routes import farms, crops, fields, ndvi, weather, soil, kpi, yield_prediction, carbon, stress

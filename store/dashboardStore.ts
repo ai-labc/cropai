@@ -44,12 +44,23 @@ interface DashboardState {
   isLoadingNDVI: boolean;
   isLoadingStress: boolean;
   error: string | null;
+  locationInput: { lat: number | null; lng: number | null };
+  mapCenter: { lat: number; lng: number } | null;
+  searchResult: {
+    status: 'idle' | 'searching' | 'success' | 'not_found';
+    message: string | null;
+    distance: number | null;
+  } | null;
   
   // Actions
   setFilters: (filters: Partial<DashboardFilters>) => void;
   setSelectedFarm: (farm: Farm | null) => void;
   setSelectedCrop: (crop: Crop | null) => void;
   setActiveMapLayer: (layer: MapLayerType) => void;
+  setLocationInput: (location: { lat: number | null; lng: number | null }) => void;
+  setMapCenter: (center: { lat: number; lng: number } | null) => void;
+  setSearchResult: (result: { status: 'idle' | 'searching' | 'success' | 'not_found'; message: string | null; distance: number | null } | null) => void;
+  findNearestFarm: (lat: number, lng: number) => void;
   
   // Data fetching actions
   loadFarms: () => Promise<void>;
@@ -91,6 +102,9 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   isLoadingNDVI: false,
   isLoadingStress: false,
   error: null,
+  locationInput: { lat: null, lng: null },
+  mapCenter: null,
+  searchResult: null,
 
   // Filter actions
   setFilters: (newFilters) => {
@@ -109,6 +123,10 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       stressIndices: new Map(),
       // Clear KPI when farm changes (will be reloaded when crop is also selected)
       kpiSummary: null,
+      // Update location input when farm is selected
+      locationInput: farm ? { lat: farm.location.lat, lng: farm.location.lng } : { lat: null, lng: null },
+      // Don't clear search result here - let it persist so user can see the search result
+      // searchResult will be cleared when a new search is performed or when explicitly cleared
     });
     if (farm) {
       // Only load field boundaries if crop is already selected
@@ -145,6 +163,113 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     set({ activeMapLayer: layer });
   },
 
+  setLocationInput: (location) => {
+    set({ locationInput: location });
+  },
+
+  setMapCenter: (center) => {
+    set({ mapCenter: center });
+  },
+
+  setSearchResult: (result) => {
+    set({ searchResult: result });
+  },
+
+  findNearestFarm: (lat, lng) => {
+    const state = get();
+    const { farms, crops } = state;
+    
+    // Set searching state
+    get().setSearchResult({
+      status: 'searching',
+      message: 'Searching for nearest farm...',
+      distance: null,
+    });
+    
+    if (farms.length === 0) {
+      console.warn('[DashboardStore] No farms available to search');
+      get().setSearchResult({
+        status: 'not_found',
+        message: 'No farms available to search',
+        distance: null,
+      });
+      return;
+    }
+
+    // Haversine formula to calculate distance between two coordinates
+    const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+      const R = 6371; // Earth radius in km
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLng = (lng2 - lng1) * Math.PI / 180;
+      const a = 
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLng / 2) * Math.sin(dLng / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c; // Distance in km
+    };
+
+    // Find nearest farm within 50km radius
+    let nearestFarm: Farm | null = null;
+    let minDistance = 50; // 50km radius
+
+    // Explicitly type farms array to help TypeScript inference
+    const farmsArray: Farm[] = farms;
+    farmsArray.forEach((farm) => {
+      const distance = calculateDistance(lat, lng, farm.location.lat, farm.location.lng);
+      if (distance < minDistance) {
+        minDistance = distance;
+        nearestFarm = farm;
+      }
+    });
+
+    if (nearestFarm) {
+      const foundFarm: Farm = nearestFarm;
+      console.log(`[DashboardStore] Found nearest farm: ${foundFarm.name} (${minDistance.toFixed(2)}km away)`);
+      
+      // Set success result
+      get().setSearchResult({
+        status: 'success',
+        message: `Found ${foundFarm.name} (${minDistance.toFixed(2)}km away)`,
+        distance: minDistance,
+      });
+      
+      // Set the farm
+      get().setSelectedFarm(foundFarm);
+      
+      // Find and set the default crop for this farm
+      if (foundFarm.defaultCropId && crops.length > 0) {
+        const defaultCrop = crops.find(c => c.id === foundFarm.defaultCropId);
+        if (defaultCrop) {
+          // Use setTimeout to ensure farm is set before crop
+          setTimeout(() => {
+            get().setSelectedCrop(defaultCrop);
+          }, 0);
+        }
+      }
+      
+      // Set map center to searched location
+      get().setMapCenter({ lat, lng });
+    } else {
+      console.log('[DashboardStore] No farm found within 50km radius');
+      
+      // Set not found result
+      get().setSearchResult({
+        status: 'not_found',
+        message: 'No farm found within 50km radius',
+        distance: null,
+      });
+      
+      // Clear farm and crop selection to avoid user confusion
+      // since the map moved but no farm was found
+      get().setSelectedFarm(null);
+      get().setSelectedCrop(null);
+      
+      // Still move the map to the searched location even if no farm found
+      get().setMapCenter({ lat, lng });
+    }
+  },
+
   // Data loading actions
   loadFarms: async () => {
     try {
@@ -152,9 +277,10 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       const response = await apiClient.getFarms();
       if (response.status === 'success') {
         set({ farms: response.data });
-        // Auto-select first farm if none selected
+        // Auto-select farm-1 (Hartland Colony) by default if none selected
         if (!get().selectedFarm && response.data.length > 0) {
-          get().setSelectedFarm(response.data[0]);
+          const defaultFarm = response.data.find(f => f.id === 'farm-1') || response.data[0];
+          get().setSelectedFarm(defaultFarm);
         }
       }
     } catch (error) {

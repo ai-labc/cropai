@@ -21,13 +21,15 @@ async def get_farms():
             "id": "farm-1",
             "name": "Hartland Colony",
             "location": {"lat": 52.619167, "lng": -113.092639},  # 52°37'09.0"N, 113°05'33.5"W
-            "area": 250.5
+            "area": 250.5,
+            "defaultCropId": "crop-1"  # Canola
         },
         {
             "id": "farm-2",
             "name": "Exceedagro Reference Field",
             "location": {"lat": 54.0167, "lng": -124.0167},  # Vanderhoof, BC
-            "area": 180.3
+            "area": 180.3,
+            "defaultCropId": "crop-2"  # Timothy Hay
         }
     ]
     
@@ -49,13 +51,15 @@ async def get_farm(farm_id: str):
             "id": "farm-1",
             "name": "Hartland Colony",
             "location": {"lat": 52.619167, "lng": -113.092639},
-            "area": 250.5
+            "area": 250.5,
+            "defaultCropId": "crop-1"  # Canola
         },
         "farm-2": {
             "id": "farm-2",
             "name": "Exceedagro Reference Field",
             "location": {"lat": 54.0167, "lng": -124.0167},
-            "area": 180.3
+            "area": 180.3,
+            "defaultCropId": "crop-2"  # Timothy Hay
         }
     }
     

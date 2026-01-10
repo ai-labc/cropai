@@ -12,6 +12,7 @@ export interface Farm {
     lng: number;
   };
   area: number; // hectares
+  defaultCropId: string; // 기본 작물 ID
 }
 
 export interface Crop {

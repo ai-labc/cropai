@@ -30,7 +30,8 @@ export function FarmMap({
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
-  const { loadNDVIGrid, loadStressIndex, isLoadingNDVI, isLoadingStress } = useDashboardStore();
+  const { loadNDVIGrid, loadStressIndex, isLoadingNDVI, isLoadingStress, mapCenter } = useDashboardStore();
+  const prevMapCenterRef = useRef<{ lat: number; lng: number } | null>(null);
   
   // Track previous state to prevent unnecessary re-renders
   const prevActiveLayerRef = useRef<MapLayerType>(activeLayer);
@@ -678,6 +679,36 @@ export function FarmMap({
     prevStressIndicesKeysRef.current = currentStressKeys;
     prevFieldBoundariesIdsRef.current = currentFieldIds;
   }, [activeLayer, mapLoaded, fieldBoundaries, ndviGrids, stressIndices, loadNDVIGrid, loadStressIndex]);
+
+  // Handle map center changes (for location search)
+  useEffect(() => {
+    if (!map.current || !mapLoaded || !mapCenter || !mapInitializedRef.current) {
+      return;
+    }
+
+    // Check if center actually changed
+    const prevCenter = prevMapCenterRef.current;
+    if (prevCenter && 
+        prevCenter.lat === mapCenter.lat && 
+        prevCenter.lng === mapCenter.lng) {
+      return; // No change, skip animation
+    }
+
+    console.log('[FarmMap] Moving map to center:', mapCenter);
+
+    try {
+      map.current.flyTo({
+        center: [mapCenter.lng, mapCenter.lat],
+        zoom: 13,
+        duration: 1500,
+        essential: true, // Animate even if user is interacting
+      });
+      
+      prevMapCenterRef.current = mapCenter;
+    } catch (error) {
+      console.error('[FarmMap] Error moving map to center:', error);
+    }
+  }, [mapLoaded, mapCenter]);
 
   // Get layer info for header and legend
   const getLayerInfo = () => {

@@ -4,6 +4,7 @@
  */
 
 const CACHE_PREFIX = 'cropai_cache_';
+const CACHE_VERSION = 'v2'; // Increment when data structure changes
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days (longer cache for better performance)
 
 interface CacheEntry<T> {
@@ -14,7 +15,7 @@ interface CacheEntry<T> {
 
 export class APICache {
   private static getCacheKey(endpoint: string): string {
-    return `${CACHE_PREFIX}${endpoint}`;
+    return `${CACHE_PREFIX}${CACHE_VERSION}_${endpoint}`;
   }
 
   static get<T>(endpoint: string): T | null {

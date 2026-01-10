@@ -20,6 +20,7 @@ class Farm(BaseModel):
     name: str
     location: Location
     area: float  # hectares
+    defaultCropId: str  # 기본 작물 ID
 
 
 class Crop(BaseModel):
